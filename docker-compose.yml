@@ -16,22 +16,19 @@ services:
     volumes:
        - ./minio_data:/data
     command: server /data --console-address ":9001"
-    # [Fix] 移除 healthcheck，避免因為 image 缺工具導致誤判
-    # healthcheck: ... (Deleted)
 
   minio-mc:
     image: minio/mc
     depends_on:
-      # [Fix] 因為移除了 healthcheck，這裡只需等待 "started"
       minio:
         condition: service_started
     entrypoint: >
       /bin/sh -c "
-      # 手動等待幾秒讓 MinIO 準備好
       sleep 5;
       until (/usr/bin/mc alias set myminio http://minio:9000 admin password) do echo '...waiting...' && sleep 1; done;
       /usr/bin/mc mb --ignore-existing myminio/warehouse;
-      /usr/bin/mc mb --ignore-existing myminio/checkpoint;
+      # [Fix] 改用複數名 'checkpoints' 避免 S3 命名規則錯誤
+      /usr/bin/mc mb --ignore-existing myminio/checkpoints;
       echo 'Buckets created successfully';
       exit 0;
       "
@@ -71,13 +68,15 @@ services:
     image: tabulario/spark-iceberg:latest
     container_name: lakehouse-spark
     depends_on:
-      # [Fix] 同樣改為 service_started
       minio:
         condition: service_started
       kafka:
         condition: service_started
     volumes:
       - ./src:/home/iceberg/local/src
+      - ./warehouse:/home/iceberg/warehouse
+      - ./spark-events:/home/iceberg/spark-events
+      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
     environment:
       AWS_ACCESS_KEY_ID: admin
       AWS_SECRET_ACCESS_KEY: password
