@@ -7,7 +7,7 @@ Build a high-throughput streaming lakehouse capable of handling **50,000+ events
 * **Throughput:** Peak support for 50k events/sec.
 * **Latency:** Data visibility in the serving layer (`orders_current`) within 60 seconds.
 * **Consistency:** Exactly-once semantics via idempotent writes; consistent reads via Snapshot isolation.
-* **Efficiency:** Query latency < 5s achieved via an automated "Sawtooth" compaction strategy.
+* **Efficiency:** Query latency < 30s achieved via an automated "Sawtooth" compaction strategy.
 
 ## 2. Architecture
 ### 2.1 High-Level Data Flow

@@ -14,8 +14,6 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
-    volumes:
-       - ./minio_data:/data
     command: server /data --console-address ":9001"
     networks:
       default:
@@ -90,6 +88,8 @@ services:
   spark:
     image: tabulario/spark-iceberg:latest
     container_name: lakehouse-spark
+    mem_limit: 6g
+    mem_reservation: 4g
     depends_on:
       - minio
       - kafka
@@ -99,6 +99,7 @@ services:
       # 移除 ./warehouse 掛載，因為現在透過 S3 協議走，不需要本地模擬
       - ./spark-events:/home/iceberg/spark-events
       - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+      - ./ivy_cache:/root/.ivy2
     environment:
       AWS_ACCESS_KEY_ID: admin
       AWS_SECRET_ACCESS_KEY: password
@@ -106,6 +107,7 @@ services:
       AWS_ENDPOINT_URL: http://minio:9000
       AWS_ALLOW_HTTP: "true"
     ports:
+      - "4040:4040"
       - "8888:8888"
       - "9090:8080"
       - "10000:10000"

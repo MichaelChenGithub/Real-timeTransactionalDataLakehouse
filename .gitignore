@@ -29,3 +29,7 @@ Thumbs.db
 # 如果你有把 docker logs 導出到檔案，也要忽略
 *.log
 spark-events/
+
+
+# Maven/Ivy Cache
+ivy_cache/

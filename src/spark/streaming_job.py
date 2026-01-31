@@ -10,7 +10,7 @@ def create_spark_session():
 
 def init_tables(spark):
     """
-    Initialize Bronze (ODS) 和 Gold (State) tables
+    Initialize Bronze (ODS) & Gold (State) tables
     """
     print("Initializing Iceberg Tables (Bronze & Gold)...")
     
@@ -97,25 +97,25 @@ def process_batch(df, batch_id):
                         ORDER BY event_timestamp DESC
                     ) as current_status,
                     
-                    first_value(total_amount, true) OVER (
+                    first_value(total_amount) IGNORE NULLS OVER (
                         PARTITION BY order_id 
                         ORDER BY event_timestamp DESC
                         ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
                     ) as total_amount,
                     
-                    first_value(currency, true) OVER (
+                    first_value(currency) IGNORE NULLS OVER (
                         PARTITION BY order_id 
                         ORDER BY event_timestamp DESC
                         ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
                     ) as currency,
                     
-                    first_value(payment_method, true) OVER (
+                    first_value(payment_method) IGNORE NULLS OVER (
                         PARTITION BY order_id 
                         ORDER BY event_timestamp DESC
                         ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
                     ) as payment_method,
 
-                    first_value(items, true) OVER (
+                    first_value(items) IGNORE NULLS OVER (
                         PARTITION BY order_id 
                         ORDER BY event_timestamp DESC
                         ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
@@ -201,7 +201,7 @@ def main():
     query = parsed_stream.writeStream \
         .foreachBatch(process_batch) \
         .option("checkpointLocation", "s3a://checkpoints/orders_bronze_gold_v1") \
-        .trigger(processingTime="5 seconds") \
+        .trigger(processingTime="30 seconds") \
         .start()
 
     query.awaitTermination()
