@@ -52,6 +52,12 @@ def init_tables(spark):
         kafka_ts TIMESTAMP
     ) USING iceberg
     PARTITIONED BY (bucket(16, order_id))
+    TBLPROPERTIES (
+        'write.merge.mode'='merge-on-read',
+        'write.update.mode'='merge-on-read',
+        'write.delete.mode'='merge-on-read',
+        'format-version'='2'
+    )
     """)
 
 def process_batch(df, batch_id):
@@ -89,7 +95,7 @@ def process_batch(df, batch_id):
             SELECT * FROM (
                 SELECT 
                     order_id,
-                    user_id, -- 假設 user_id 不會變，取最新即可
+                    user_id,
                     
 
                     first_value(current_status) OVER (

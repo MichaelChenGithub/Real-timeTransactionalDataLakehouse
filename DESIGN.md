@@ -87,7 +87,7 @@ Instead of a linear dependency, the system employs a **Parallel Processing** pat
 
 ### 3.3 Processing Layer: Spark Structured Streaming
 * **Engine:** Apache Spark 3.x
-* **Trigger Interval:** 1 minute (Micro-batch).
+* **Trigger Interval:** 30 seconds (Micro-batch).
 * **Consistency:** Enabled by Iceberg's Optimistic Concurrency Control (OCC).
 * **Parallelism:** Aligned with Kafka partitions (4 cores minimum) to maximize throughput without shuffle overhead.
 

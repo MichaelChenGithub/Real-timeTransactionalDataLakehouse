@@ -1,1 +1,6 @@
-☐ Trino @started(26-01-30 21:08)
+✔ Trino @started(26-01-30 21:08) @done(26-01-30 22:25) @lasted(1h17m13s)
+✔ Merge on Read (MoR) Strategy for Iceberg Gold Layer @started(26-01-30 22:25) @done(26-01-30 22:41) @lasted(16m32s)
+    # setting up Iceberg table with Merge on Read (MoR) strategy for gold layer to handle updates and deletes
+☐ Airflow Integration for compaction task
+☐ Grafana for evaluating the performance
+☐ Metabase for data exploration and visualization
