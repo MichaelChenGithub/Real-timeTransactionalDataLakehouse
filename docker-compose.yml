@@ -125,3 +125,24 @@ services:
     depends_on:
       - iceberg-rest
       - minio
+  
+  airflow:
+    build:
+      context: .
+      dockerfile: Dockerfile-airflow
+    container_name: lakehouse-airflow
+    user: "0:0"
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/home/iceberg/local/src
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__SHOW_RECENT_STATS_FOR_DAG_RUNS=False
+    command: bash -c "airflow db init && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com && airflow scheduler & airflow webserver"
+    depends_on:
+      - spark

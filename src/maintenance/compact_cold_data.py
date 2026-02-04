@@ -5,10 +5,6 @@ from pyspark.sql import SparkSession
 def create_spark_session():
     return SparkSession.builder \
         .appName("IcebergColdCompaction") \
-        .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions") \
-        .config("spark.sql.catalog.lakehouse", "org.apache.iceberg.spark.SparkCatalog") \
-        .config("spark.sql.catalog.lakehouse.type", "hadoop") \
-        .config("spark.sql.catalog.lakehouse.warehouse", "s3a://warehouse/") \
         .getOrCreate()
 
 def compact_bronze_cold(spark):
@@ -109,6 +105,9 @@ def main():
         
     except Exception as e:
         print(f"Error during maintenance: {e}")
-
+        sys.exit(1)
+    finally:
+        spark.stop()
+        
 if __name__ == "__main__":
     main()
