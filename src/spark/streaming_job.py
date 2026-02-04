@@ -207,7 +207,7 @@ def main():
     query = parsed_stream.writeStream \
         .foreachBatch(process_batch) \
         .option("checkpointLocation", "s3a://checkpoints/orders_bronze_gold_v1") \
-        .trigger(processingTime="30 seconds") \
+        .trigger(processingTime="10 seconds") \
         .start()
 
     query.awaitTermination()

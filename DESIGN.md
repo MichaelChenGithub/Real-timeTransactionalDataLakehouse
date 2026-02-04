@@ -116,3 +116,18 @@ The environment simulates a cloud-native stack locally:
 1.  **Small File Problem:** Mitigated by `spark.sql.shuffle.partitions` tuning and hourly compaction jobs.
 2.  **Backpressure:** Handled via `spark.streaming.kafka.maxOffsetsPerTrigger` to prevent OOM during traffic spikes.
 3.  **Data Ordering:** Enforced by Kafka Partition Key (`order_id`) and Spark's 1:1 partition mapping.
+
+
+## Run Commands
+
+- Generate fake order events and publish to the Kafka `orders` topic:
+
+```bash
+python src/generator/mock_kafka_producer.py
+```
+
+- Launch Spark Structured Streaming to read from Kafka and write to Iceberg (dual-stream):
+
+```bash
+docker exec -it lakehouse-spark spark-submit /home/iceberg/local/src/spark/streaming_job.py
+```
