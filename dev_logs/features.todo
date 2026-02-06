@@ -4,11 +4,13 @@
 ✔ Airflow Integration for compaction task @done(26-02-05 20:50)
 ✔ Grafana for evaluating the performance @done(26-02-05 20:50)
 ☐ Design Doc
-    ✔ 1. pipeline 架構 （python -> kafka -> spark ss (Gold Upsert 邏輯, bronze(head/body)) -> Trino -> metabase/grafana @done(26-02-06 03:00)
-    ☐ 2. dashboard 設計 （realtime dashboard, 後續分析 dashboard）
-    ☐ 3. data model 設計（gold layer, silver batch, dim table...）
-    ☐ 4. Python generator 事件設計(streaming, dim table init and update)
-    ☐ 5. airflow 管理 batch 事件 (compaction, batch bronze -> silver)
+    ✔ pipeline 架構 （python -> kafka -> spark ss (Gold Upsert 邏輯, bronze(head/body)) -> Trino -> metabase/grafana @done(26-02-06 03:00)
+    ✔ Metabase dashboard 設計 @done(26-02-06 15:55)
+    ☐ raw_events, virality_states schema 設計 (iceberg table schema)
+    ☐ silver data model 設計 (star schema -> fact table and dim table)
+    ☐ Python generator 事件設計(streaming, dim table init and update)
+    ☐ airflow 管理 batch 事件 (compaction, batch bronze -> silver)
+    ✔ Grafana dashboard 設計 @done(26-02-06 15:55)
 ☐ Python generator
     ☐ dimension tables (users, videos)
     ☐ streaming event(user_id and video_id must from dim tables)

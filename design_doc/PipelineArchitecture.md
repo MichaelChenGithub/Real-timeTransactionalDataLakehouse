@@ -1,7 +1,7 @@
 
 ---
 
-# Design Doc Part 1: Pipeline Architecture & Data Flow
+# Design Doc : Pipeline Architecture & Data Flow
 
 ## 1. Architecture Overview
 
@@ -37,52 +37,58 @@ graph LR
     subgraph Sources["1. Sources & Ingestion"]
         direction TB
         EventGen[("Mock Event Gen")]:::source
-        DimGen[("Mock Dim Gen")]:::source
-        Kafka["Apache Kafka <br/> Topic: content_events"]:::source
+        DimGen[("Mock CDC Gen")]:::source
+        KafkaEvents["Kafka: content_events"]:::source
+        KafkaCDC["Kafka: content_cdc"]:::source
         
-        EventGen --> Kafka
+        EventGen --> KafkaEvents
+        DimGen --> KafkaCDC
     end
 
     %% ==================== 2. Processing Layer ====================
     subgraph Compute["2. Processing Layer"]
         direction TB
-        SparkSS["Spark Structured Streaming<br/>(micro-batch)"]:::stream
+        
+        %% Stream A: Main Event Stream
+        SparkSS["Spark SS: Events<br/>(Trigger: 10s)"]:::stream
+        
+        %% Stream B: Metadata Stream (New CDC Path)
+        SparkDims["Spark SS: Dims CDC<br/>(Trigger: 5m)"]:::stream
         
         subgraph AirflowGroup["Airflow Orchestration"]
             direction TB
-            
-            DimJob["Spark Batch:<br/>Dim Updates (SCD2)"]:::batch
             SilverJob["Spark Batch:<br/>Event Enrichment"]:::batch
             CompactJob["Spark Batch:<br/>Compaction"]:::batch
         end
     end
 
-    Kafka ==> SparkSS
-    DimGen -.-> DimJob
+    KafkaEvents ==> SparkSS
+    KafkaCDC ==> SparkDims
 
     %% ==================== 3. Iceberg Lakehouse ====================
     subgraph Storage["3. Iceberg Lakehouse (MinIO/S3)"]
         direction TB
         spacer[" "]:::hidden
         Bronze["Bronze: raw_events<br/>(append-only)"]:::storage
-        DimBronze["Dim Bronze: raw<br/>(snapshot)"]:::storage
-        Silver["Silver: events_enriched<br/>(cleaned/sessionized)"]:::storage
-        DimSilver["Dim Silver: users/videos<br/>(SCD Type 2)"]:::storage
         Gold["Gold: virality_state<br/>(MoR upsert)"]:::storage
+        Dims["Dims: users/videos<br/>(SCD Type 1/2)"]:::storage
+        Silver["Silver: events_enriched<br/>(cleaned/sessionized)"]:::storage
     end
 
     %% ==================== 4. Data Flow ====================
-    SparkSS -->|Append Head + Body| Bronze
-    SparkSS -->|"MERGE upsert"| Gold
+    %% Stream Writes (Hot Path)
+    SparkSS -->|Append Body| Bronze
+    SparkSS -->|MERGE Upsert| Gold
+    SparkDims -->|MERGE Upsert| Dims
     
-    DimJob -->|read| DimBronze
-    DimJob -->|"write"| DimSilver
-    
+    %% Batch Writes (Cold Path)
     SilverJob -->|write| Silver
     SilverJob -->|read| Bronze
     
+    %% Maintenance
     CompactJob -.->|optimize| Bronze
     CompactJob -.->|optimize| Gold
+    CompactJob -.->|optimize| Dims
 
     %% ==================== 5. Serving Layer ====================
     subgraph Serving["4. Serving Layer"]
@@ -94,19 +100,22 @@ graph LR
 
     Gold --> Trino
     Silver --> Trino
-    DimSilver --> Trino
+    Dims --> Trino
     
     Trino -->|"JDBC"| Metabase
     Trino -->|"JDBC"| Grafana
 
 
-    %% ==================== Hot vs Cold Path ====================
-    %% ==================== Hot vs Cold Path ====================
-    %% HOT (Real-time streaming)
-    linkStyle 0,1,3,4 stroke:#ff5722,stroke-width:3px
+    %% ==================== Hot vs Cold Path Styling ====================
+    %% HOT PATH (Real-time & Fast Batch) - Orange Lines
+    %% Note: Link indices depend on definition order.
+    %% 0:Event->Kafka, 1:Dim->Kafka, 2:Kafka->SparkSS, 3:Kafka->SparkDims
+    %% 4:SparkSS->Bronze, 5:SparkSS->Gold, 6:SparkDims->Dims
+    linkStyle 0,1,2,3,4,5,6 stroke:#ff5722,stroke-width:3px
 
-    %% COLD (Batch / Offline)
-    linkStyle 2,5,6,7,8,9,10 stroke:#7b1fa2,stroke-width:2px,stroke-dasharray:5 5
+    %% COLD PATH (Batch / Offline) - Purple Dashed
+    %% 7:Silver->Silver, 8:Silver->Bronze, 9,10,11:Compact->Storage
+    linkStyle 7,8,9,10,11 stroke:#7b1fa2,stroke-width:2px,stroke-dasharray:5 5
 
     classDef hidden height:1px,fill:none,stroke:none,color:none;
 
@@ -124,7 +133,6 @@ graph LR
 * **Rationale:** The Real-time Dashboard is **Content-Centric** (Viral Velocity). Partitioning by `video_id` ensures all interactions (likes, shares) for a specific video land in the same Kafka partition, minimizing Shuffle overhead.
 
 
-
 ### 3.2 Stream Processing Layer (The Core)
 
 * **Engine:** Apache Spark Structured Streaming (Micro-batch Mode).
@@ -134,19 +142,24 @@ graph LR
 * **Stream B (Gold):** Stateful Upsert (`MERGE INTO`) to maintain the real-time "Viral Score" of videos.
 
 
+### 3.3 Dimension Management (CDC Streaming Ingestion)
 
-### 3.3 Dimension Management (Airflow + Spark Batch)
-
+* **Objective:** Ensure metadata (e.g., Video Category, User Risk Profile) is available for joining with real-time metrics with **< 5 minute latency**, supporting the "Read-time Join" pattern in Trino.
 * **Workflow:**
-1. **Initialization:** A one-time batch job loads initial `dim_users` and `dim_videos` (10k users, 1k videos) into Iceberg.
-2. **Daily Updates (SCD Type 1/2):**
-* Airflow triggers a Python Generator script to simulate "Profile Updates" (e.g., User changes country, Video gets banned).
-* Spark Batch Job reads these updates and performs `MERGE INTO` on the Iceberg Dimension tables.
+1. **Source (CDC Stream):**
+* A Python Generator simulates database changes (Create/Update/Delete) and pushes them to a separate Kafka Topic: `content_cdc`.
+* *Payload:* `{ "op": "u", "ts_ms": 170000..., "before": null, "after": { "video_id": "v_1023", "category": "Beauty", "status": "active" } }`
 
 
+2. **Ingestion (Spark Structured Streaming):**
+* A separate Spark Streaming job reads `content_cdc`.
+* **Trigger:** ProcessingTime = `5 minutes` (Micro-batch).
+* **Logic:** Deduplicates updates within the batch (keeping the latest `op` per ID) to minimize Merge overhead.
 
 
-* **Purpose:** Enables Trino to join real-time metrics with rich metadata (e.g., "Viral Velocity by *Video Category*").
+3. **Storage (Iceberg MERGE):**
+* Performs `MERGE INTO lakehouse.dims.dim_videos` inserts new versions (SCD Type 2) based on business logic.
+* **Why Micro-batch?** Iceberg supports streaming writes, but `MERGE` operations are expensive. Batching updates every 5 minutes balances data freshness with write efficiency (avoiding the "Small File Problem").
 
 ### 3.4 Serving Layer
 
@@ -159,7 +172,21 @@ graph LR
 * **Metabase:** Queries Gold + Dims for Business Ops.
 * **Grafana:** Queries System Metrics (Lag, Latency).
 
+### 3.5 Maintenance Layer: Compaction Strategy (Airflow + Spark Batch)
 
+* **Objective:** Solve the "Small File Problem" inherent to streaming ingestion (where 10s triggers create tiny files) and optimize read performance for Trino by reducing metadata overhead.
+* **Schedule:** Triggered **Hourly (every 60 minutes)** via Airflow.
+* **Strategy by Table Type:**
+1. **Bronze (Append-Only):**
+* **Action:** **Bin-packing**.
+* **Logic:** The Spark job identifies small Parquet files created in the last hour and rewrites them into larger, optimal-sized files (Target: ~128MB) using ZSTD compression.
+
+2. **Gold & Dims (Merge-on-Read):**
+* **Action:** **Major Compaction (Rewrite Data Files)**.
+* **Logic:** Streaming `MERGE` operations create "Delete Files" (tombstones) rather than rewriting data immediately. Over time, this increases read latency (Read Amplification). This job forces a rewrite of data files to physically apply deletes and updates, resetting the read performance.
+
+* **Snapshot Management:**
+* **Expire Snapshots:** The job also runs `expire_snapshots` to remove historical versions older than 7 days, preventing metadata bloat and freeing up physical storage on MinIO.
 
 ---
 
