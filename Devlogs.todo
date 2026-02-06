@@ -1,6 +1,23 @@
 ✔ Trino @started(26-01-30 21:08) @done(26-01-30 22:25) @lasted(1h17m13s)
 ✔ Merge on Read (MoR) Strategy for Iceberg Gold Layer @started(26-01-30 22:25) @done(26-01-30 22:41) @lasted(16m32s)
     # setting up Iceberg table with Merge on Read (MoR) strategy for gold layer to handle updates and deletes
-☐ Airflow Integration for compaction task
-☐ Grafana for evaluating the performance
+✔ Airflow Integration for compaction task @done(26-02-05 20:50)
+✔ Grafana for evaluating the performance @done(26-02-05 20:50)
+☐ Design Doc
+    ✔ 1. pipeline 架構 （python -> kafka -> spark ss (Gold Upsert 邏輯, bronze(head/body)) -> Trino -> metabase/grafana @done(26-02-06 03:00)
+    ☐ 2. dashboard 設計 （realtime dashboard, 後續分析 dashboard）
+    ☐ 3. data model 設計（gold layer, silver batch, dim table...）
+    ☐ 4. Python generator 事件設計(streaming, dim table init and update)
+    ☐ 5. airflow 管理 batch 事件 (compaction, batch bronze -> silver)
+☐ Python generator
+    ☐ dimension tables (users, videos)
+    ☐ streaming event(user_id and video_id must from dim tables)
+    ☐ batch event for updating dimension tables (e.g. user info update, video info update)
+☐ Streaming pipeline
+    ☐ Spark Structured Streaming for real-time processing
+    ☐ Merge on Read (MoR) strategy for gold layer to handle updates and deletes
+☐ New Airflow Integration
+    ☐ hourly compaction task
+    ☐ daily dimension table updates
+    ☐ daily batch processing from bronze to silver layer(including dim and fact tables)
 ☐ Metabase for data exploration and visualization

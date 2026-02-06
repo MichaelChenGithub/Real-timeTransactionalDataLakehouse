@@ -8,8 +8,8 @@ from faker import Faker
 
 # --- Configuration ---
 KAFKA_TOPIC = 'orders'
-KAFKA_BOOTSTRAP_SERVERS = 'localhost:9092'  # 注意：Python 在外部，連 9092
-GENERATION_INTERVAL = 0.5  # 每 0.5 秒產生一筆 (可自行調整快慢)
+KAFKA_BOOTSTRAP_SERVERS = 'localhost:9092'
+GENERATION_INTERVAL = 0.5
 
 # --- Setup ---
 fake = Faker()
