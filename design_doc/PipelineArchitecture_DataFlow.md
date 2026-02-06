@@ -38,7 +38,7 @@ graph LR
         direction TB
         EventGen[("Mock Event Gen")]:::source
         DimGen[("Mock Dim Gen")]:::source
-        Kafka["Apache Kafka\nTopic: content_events"]:::source
+        Kafka["Apache Kafka <br/> Topic: content_events"]:::source
         
         EventGen --> Kafka
     end
@@ -46,13 +46,14 @@ graph LR
     %% ==================== 2. Processing Layer ====================
     subgraph Compute["2. Processing Layer"]
         direction TB
-        SparkSS["Spark Structured Streaming\n(micro-batch)"]:::stream
+        SparkSS["Spark Structured Streaming<br/>(micro-batch)"]:::stream
         
         subgraph AirflowGroup["Airflow Orchestration"]
             direction TB
-            DimJob["Spark Batch:\nDim Updates (SCD2)"]:::batch
-            SilverJob["Spark Batch:\nEvent Enrichment"]:::batch
-            CompactJob["Spark Batch:\nCompaction"]:::batch
+            
+            DimJob["Spark Batch:<br/>Dim Updates (SCD2)"]:::batch
+            SilverJob["Spark Batch:<br/>Event Enrichment"]:::batch
+            CompactJob["Spark Batch:<br/>Compaction"]:::batch
         end
     end
 
@@ -62,14 +63,15 @@ graph LR
     %% ==================== 3. Iceberg Lakehouse ====================
     subgraph Storage["3. Iceberg Lakehouse (MinIO/S3)"]
         direction TB
-        Bronze["Bronze: raw_events\n(append-only)"]:::storage
-        DimBronze["Dim Bronze: raw\n(snapshot)"]:::storage
-        Silver["Silver: events_enriched\n(cleaned/sessionized)"]:::storage
-        DimSilver["Dim Silver: users/videos\n(SCD Type 2)"]:::storage
-        Gold["Gold: virality_state\n(MoR upsert)"]:::storage
+        spacer[" "]:::hidden
+        Bronze["Bronze: raw_events<br/>(append-only)"]:::storage
+        DimBronze["Dim Bronze: raw<br/>(snapshot)"]:::storage
+        Silver["Silver: events_enriched<br/>(cleaned/sessionized)"]:::storage
+        DimSilver["Dim Silver: users/videos<br/>(SCD Type 2)"]:::storage
+        Gold["Gold: virality_state<br/>(MoR upsert)"]:::storage
     end
 
-    %% ==================== 4. Data Flow (完全還原原始邏輯) ====================
+    %% ==================== 4. Data Flow ====================
     SparkSS -->|Append Head + Body| Bronze
     SparkSS -->|"MERGE upsert"| Gold
     
@@ -86,8 +88,8 @@ graph LR
     subgraph Serving["4. Serving Layer"]
         direction TB
         Trino["Trino Query Engine"]:::serving
-        Metabase["Metabase\n(Ops Dashboard)"]:::serving
-        Grafana["Grafana\n(System Metrics)"]:::serving
+        Metabase["Metabase<br/>(Ops Dashboard)"]:::serving
+        Grafana["Grafana<br/>(System Metrics)"]:::serving
     end
 
     Gold --> Trino
@@ -97,9 +99,16 @@ graph LR
     Trino -->|"JDBC"| Metabase
     Trino -->|"JDBC"| Grafana
 
-    %% ==================== Link Styles (維持你原來的索引) ====================
-    %% linkStyle 6,7,8,9,10,11 stroke:#7b1fa2,stroke-width:2px
-    %% linkStyle 4,5 stroke:#ff6f00,stroke-width:3px
+
+    %% ==================== Hot vs Cold Path ====================
+    %% ==================== Hot vs Cold Path ====================
+    %% HOT (Real-time streaming)
+    linkStyle 0,1,3,4 stroke:#ff5722,stroke-width:3px
+
+    %% COLD (Batch / Offline)
+    linkStyle 2,5,6,7,8,9,10 stroke:#7b1fa2,stroke-width:2px,stroke-dasharray:5 5
+
+    classDef hidden height:1px,fill:none,stroke:none,color:none;
 
 ```
 
