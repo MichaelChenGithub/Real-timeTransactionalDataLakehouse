@@ -3,11 +3,12 @@ import time
 import random
 import uuid
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 from confluent_kafka import Producer
 try:
     from pyiceberg.catalog import load_catalog
 except ImportError:
+    load_catalog = None
     print("Warning: pyiceberg not installed. Install with: pip install 'pyiceberg[s3fs]'")
 
 # --- Configuration ---
@@ -47,13 +48,14 @@ class ContentEventGenerator:
         self.video_metadata = {}
         self.catalog = None
         try:
-            self.catalog = load_catalog("default", **{
-                "type": "rest",
-                "uri": ICEBERG_REST_URI,
-                "s3.endpoint": MINIO_ENDPOINT,
-                "s3.access-key-id": MINIO_CREDS["admin"],
-                "s3.secret-access-key": MINIO_CREDS["password"]
-            })
+            if load_catalog:
+                self.catalog = load_catalog("default", **{
+                    "type": "rest",
+                    "uri": ICEBERG_REST_URI,
+                    "s3.endpoint": MINIO_ENDPOINT,
+                    "s3.access-key-id": MINIO_CREDS["admin"],
+                    "s3.secret-access-key": MINIO_CREDS["password"]
+                })
         except Exception as e:
             print(f"Catalog init failed: {e}")
 
@@ -63,21 +65,26 @@ class ContentEventGenerator:
         """Hydrate ID pools from Iceberg Dimension Tables"""
         global VIDEO_POOL, USER_POOL
         try:
-            if not self.catalog: return
-            
-            # Load Videos
-            tbl_v = self.catalog.load_table("lakehouse.dims.dim_videos")
-            rows = tbl_v.scan(selected_fields=("video_id", "duration_ms"), limit=POOL_SIZE_LIMIT).to_arrow().to_pylist()
-            VIDEO_POOL = [r["video_id"] for r in rows]
-            self.video_metadata = {r["video_id"]: r.get("duration_ms", 60000) for r in rows}
-            # Load Users
-            tbl_u = self.catalog.load_table("lakehouse.dims.dim_users")
-            USER_POOL = [r["user_id"] for r in tbl_u.scan(selected_fields=("user_id",), limit=POOL_SIZE_LIMIT).to_arrow().to_pylist()]
-            
-            print(f"Refreshed Pools from Iceberg: {len(VIDEO_POOL)} Videos, {len(USER_POOL)} Users")
-            self._recalc_zipf()
+            if self.catalog:
+                # Load Videos
+                tbl_v = self.catalog.load_table("lakehouse.dims.dim_videos")
+                rows = tbl_v.scan(selected_fields=("video_id", "duration_ms"), limit=POOL_SIZE_LIMIT).to_arrow().to_pylist()
+                VIDEO_POOL = [r["video_id"] for r in rows]
+                self.video_metadata = {r["video_id"]: r.get("duration_ms", 60000) for r in rows}
+                # Load Users
+                tbl_u = self.catalog.load_table("lakehouse.dims.dim_users")
+                USER_POOL = [r["user_id"] for r in tbl_u.scan(selected_fields=("user_id",), limit=POOL_SIZE_LIMIT).to_arrow().to_pylist()]
+                
+                print(f"Refreshed Pools from Iceberg: {len(VIDEO_POOL)} Videos, {len(USER_POOL)} Users")
+                self._recalc_zipf()
         except Exception as e:
             print(f"Iceberg refresh failed (Tables might not exist yet): {e}")
+
+        if not VIDEO_POOL:
+            print("Pools empty. Falling back to random ID generation.")
+            VIDEO_POOL = [f"v_{uuid.uuid4().hex[:8]}" for _ in range(1000)]
+            USER_POOL = [f"u_{uuid.uuid4().hex[:8]}" for _ in range(2000)]
+            self._recalc_zipf()
 
     def _recalc_zipf(self):
         if not VIDEO_POOL: return
@@ -101,7 +108,7 @@ class ContentEventGenerator:
         
         base_event = {
             "event_id": str(uuid.uuid4()),
-            "event_timestamp": datetime.now(datetime.timezone.utc).isoformat(),
+            "event_timestamp": datetime.now(timezone.utc).isoformat(),
             "video_id": video_id,
             "user_id": user_id,
             "payload": {
@@ -160,6 +167,8 @@ class ContentEventGenerator:
 
     def run(self):
         print(f"--- Starting Content Event Stream ({EVENTS_PER_SEC}/sec) ---")
+        total_events = 0
+        last_log_time = time.time()
         try:
             while True:
                 start_time = time.time()
@@ -174,6 +183,7 @@ class ContentEventGenerator:
                     self.refresh_pools()
                     self.last_refresh = time.time()
 
+                batch_count = 0
                 for _ in range(sessions_needed):
                     session_events = self.generate_session()
                     for event in session_events:
@@ -183,8 +193,15 @@ class ContentEventGenerator:
                             value=json.dumps(event), 
                             on_delivery=delivery_report
                         )
+                        batch_count += 1
+                
+                total_events += batch_count
                 
                 producer.poll(0)
+
+                if time.time() - last_log_time > 5:
+                    print(f"[ContentGen] Sent {batch_count} events in this batch. Total: {total_events}. Pool: {len(VIDEO_POOL)}V/{len(USER_POOL)}U")
+                    last_log_time = time.time()
                 
                 # Throttle
                 elapsed = time.time() - start_time

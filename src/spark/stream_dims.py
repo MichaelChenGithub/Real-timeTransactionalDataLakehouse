@@ -49,7 +49,13 @@ def init_tables(spark):
     """)
 
 def process_users_batch(df, batch_id):
-    if df.count() == 0: return
+    print(f"--- Processing Users Batch ID: {batch_id} ---")
+    count = df.count()
+    if count == 0:
+        print(f"Batch {batch_id}: No new data.")
+        return
+
+    print(f"Batch {batch_id}: Found {count} records. Starting Merge...")
     df.cache()
     try:
         df.createOrReplaceTempView("user_updates")
@@ -84,11 +90,21 @@ def process_users_batch(df, batch_id):
             source.user_id, source.register_country, source.device_os, source.is_creator, source.ltv_segment, source.join_at, current_timestamp()
         )
         """)
+        print(f"Batch {batch_id}: Merge completed successfully.")
+    except Exception as e:
+        print(f"Error in Users Batch {batch_id}: {str(e)}")
+        raise e
     finally:
         df.unpersist()
 
 def process_videos_batch(df, batch_id):
-    if df.count() == 0: return
+    print(f"--- Processing Videos Batch ID: {batch_id} ---")
+    count = df.count()
+    if count == 0:
+        print(f"Batch {batch_id}: No new data.")
+        return
+
+    print(f"Batch {batch_id}: Found {count} records. Starting Merge...")
     df.cache()
     try:
         df.createOrReplaceTempView("video_updates")
@@ -123,6 +139,10 @@ def process_videos_batch(df, batch_id):
             source.video_id, source.creator_id, source.category, source.hashtags, source.duration_ms, source.status, source.upload_time, current_timestamp()
         )
         """)
+        print(f"Batch {batch_id}: Merge completed successfully.")
+    except Exception as e:
+        print(f"Error in Videos Batch {batch_id}: {str(e)}")
+        raise e
     finally:
         df.unpersist()
 
@@ -151,7 +171,7 @@ def main():
     query_users = user_stream.writeStream \
         .foreachBatch(process_users_batch) \
         .option("checkpointLocation", "s3a://checkpoints/dims_users_v1") \
-        .trigger(processingTime="5 minute") \
+        .trigger(processingTime="1 minute") \
         .start()
 
     # --- Stream 2: Videos ---
@@ -167,7 +187,7 @@ def main():
     query_videos = video_stream.writeStream \
         .foreachBatch(process_videos_batch) \
         .option("checkpointLocation", "s3a://checkpoints/dims_videos_v1") \
-        .trigger(processingTime="5 minute") \
+        .trigger(processingTime="1 minute") \
         .start()
 
     spark.streams.awaitAnyTermination()

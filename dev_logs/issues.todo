@@ -13,3 +13,4 @@
     # issue: each time we build docker-compose, spark try to download all dependencies and somehow it fails. 
     # root cause: no maven/ivy cache volume for spark in docker-compose.yml
     # fix: add volume mapping for ivy cache in spark service in docker-compose.yml
+☐ stream_content.py bronze table partition by hours error

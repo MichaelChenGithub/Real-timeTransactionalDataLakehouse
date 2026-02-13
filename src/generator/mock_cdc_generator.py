@@ -92,7 +92,7 @@ class CDCGenerator:
                 "hashtags": [f"#{fake.word()}" for _ in range(random.randint(1, 5))],
                 "duration_ms": random.randint(5000, 60000),
                 "status": status,
-                "upload_time": datetime.now(datetime.timezone.utc).isoformat()
+                "upload_time": datetime.now().isoformat()
             }
         }
         

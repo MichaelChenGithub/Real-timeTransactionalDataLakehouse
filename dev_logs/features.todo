@@ -11,16 +11,21 @@
     ✔ Python generator 事件設計(streaming, dim table init and update) @done(26-02-07 18:37)
     ☐ airflow 管理 batch 事件 (compaction, batch bronze -> silver)
     ✔ Grafana dashboard 設計 @done(26-02-06 15:55)
-☐ Python generator
-    ☐ dimension tables (users, videos) @started(26-02-07 18:37)
-    ☐ streaming event(user_id and video_id must from dim tables)
-    ☐ batch event for updating dimension tables (e.g. user info update, video info update)
-☐ Streaming pipeline
-    ☐ Spark Structured Streaming for real-time processing
-        ☐ dim table streaming update with MoR strategy
-        ☐ fact table streaming update with MoR strategy
+✔ Python generator @done(26-02-11 01:09)
+    ✔ dimension tables (users, videos) @started(26-02-07 18:37) @done(26-02-11 01:09) @lasted(3d6h32m25s)
+    ✔ streaming event(user_id and video_id must from dim tables) @done(26-02-11 01:09)
+✔ Streaming pipeline @done(26-02-11 01:09)
+    ✔ Spark Structured Streaming for real-time processing @done(26-02-11 01:09)
+        ✔ dim table streaming update with MoR strategy @done(26-02-11 01:09)
+        ✔ fact table streaming update @done(26-02-11 01:10)
+☐ Validate and test for python generator and streaming pipeline
+    ☐ Event generator can access dim tables to get valid user_id and video_id @started(26-02-11 15:24)
+    ☐ End-to-end testing of the entire pipeline (from data generation to iceberg tables)
 ☐ New Airflow Integration
     ☐ hourly compaction task
-    ☐ daily dimension table updates
-    ☐ daily batch processing from bronze to silver layer(including dim and fact tables)
+        ☐ dimension table
+        ☐ gold layer fact table
+        ☐ bronze layer fact table
+    ☐ daily batch processing from bronze to silver layer
 ☐ Metabase for data exploration and visualization
+☐ New Grafana for monitoring the performance of the streaming pipeline and resource usage
